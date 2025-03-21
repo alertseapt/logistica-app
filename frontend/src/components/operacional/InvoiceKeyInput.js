@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { searchAgendamentos, updateAgendamentoStatus } from '../../services/api';
+import { searchAgendamentos, updateAgendamentoStatus, updateAgendamento } from '../../services/api';
 import { extrairNumeroNF, formatarData } from '../../utils/nfUtils';
 
 const InvoiceKeyInput = ({ onRefresh }) => {
@@ -34,14 +34,34 @@ const InvoiceKeyInput = ({ onRefresh }) => {
     }
   };
   
-  const handleReceberNota = async (id) => {
+  const handleReceberNota = async (id, agendamento) => {
     try {
+      // Verificar se é uma chave de acesso (44 dígitos) e se o agendamento ainda não tem chave
+      if (chaveAcesso.length === 44 && /^\d+$/.test(chaveAcesso) && 
+          (!agendamento.chaveAcesso || agendamento.chaveAcesso.length === 0)) {
+        
+        // Primeiro atualiza a chave de acesso
+        await updateAgendamento(id, { chaveAcesso });
+        console.log(`Chave de acesso ${chaveAcesso} adicionada ao agendamento ${id}`);
+      }
+      
+      // Depois altera o status para recebido
       await updateAgendamentoStatus(id, 'recebido');
+      
+      // Atualiza a lista de resultados
       setResultados(resultados.filter(item => item.id !== id));
+      
+      // Limpa o campo de chave de acesso
+      setChaveAcesso('');
+      
+      // Notifica que a nota foi recebida
+      setMensagem('Nota recebida com sucesso');
+      
+      // Atualiza a tela principal
       onRefresh();
     } catch (error) {
       console.error('Erro ao receber nota:', error);
-      alert('Erro ao receber nota');
+      setMensagem(`Erro ao receber nota: ${error.message}`);
     }
   };
   
@@ -70,7 +90,7 @@ const InvoiceKeyInput = ({ onRefresh }) => {
                 <span>NF: {item.numeroNF}</span>
                 <span>Cliente: {item.cliente.nome}</span>
                 <span>Data: {formatarData(item.data)}</span>
-                <button onClick={() => handleReceberNota(item.id)}>
+                <button onClick={() => handleReceberNota(item.id, item)}>
                   Receber
                 </button>
               </li>

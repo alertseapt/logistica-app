@@ -3,14 +3,14 @@ import { getAgendamentos, updateAgendamentoStatus } from '../../services/api';
 import { formatarData } from '../../utils/nfUtils';
 import InvoiceDetailsModal from './InvoiceDetailsModal';
 
-const ProcessingInvoicesList = ({ refresh, onRefresh }) => {
+const ProcessingInvoicesList = ({ refresh, onRefresh, sortOrder = 'oldest' }) => {
   const [agendamentos, setAgendamentos] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedAgendamento, setSelectedAgendamento] = useState(null);
   
   useEffect(() => {
     fetchAgendamentos();
-  }, [refresh]);
+  }, [refresh, sortOrder]);
   
   // Função auxiliar para converter timestamp para Date
   const timestampToDate = (timestamp) => {
@@ -29,8 +29,8 @@ const ProcessingInvoicesList = ({ refresh, onRefresh }) => {
     setLoading(true);
     
     try {
-      // Busca agendamentos com status "recebido", "em tratativa", "a paletizar" ou "paletizado"
-      const statusList = ['recebido', 'em tratativa', 'a paletizar', 'paletizado'];
+      // Busca agendamentos com status "recebido", "informado", "em tratativa", "a paletizar" ou "paletizado"
+      const statusList = ['recebido', 'informado', 'em tratativa', 'a paletizar', 'paletizado'];
       
       const promises = statusList.map(status => getAgendamentos({ status }));
       const responses = await Promise.all(promises);
@@ -38,26 +38,32 @@ const ProcessingInvoicesList = ({ refresh, onRefresh }) => {
       // Combina todos os resultados
       const combinedAgendamentos = responses.flat();
       
-      // Ordena por status e data de recebimento
+      // Ordena por data de recebimento conforme a preferência do usuário
       const sortedAgendamentos = combinedAgendamentos.sort((a, b) => {
-        // Prioriza status "recebido"
-        if (a.status === 'recebido' && b.status !== 'recebido') return -1;
-        if (a.status !== 'recebido' && b.status === 'recebido') return 1;
+        // Primeiro verifica se ambos têm histórico de status
+        if (!a.historicoStatus || !b.historicoStatus) return 0;
         
-        // Para status iguais, ordena por data de recebimento (mais antiga primeiro)
-        if (a.status === b.status) {
-          const recebidoA = a.historicoStatus.find(h => h.status === 'recebido');
-          const recebidoB = b.historicoStatus.find(h => h.status === 'recebido');
-          
-          if (!recebidoA || !recebidoB) return 0;
-          
-          const dataA = timestampToDate(recebidoA.timestamp);
-          const dataB = timestampToDate(recebidoB.timestamp);
-          
-          return dataA - dataB;
-        }
+        // Encontra o evento de recebimento no histórico
+        const recebidoA = a.historicoStatus.find(h => h.status === 'recebido');
+        const recebidoB = b.historicoStatus.find(h => h.status === 'recebido');
         
-        return 0;
+        // Se um tem status recebido e outro não, o que tem vem primeiro
+        if (recebidoA && !recebidoB) return -1;
+        if (!recebidoA && recebidoB) return 1;
+        
+        // Se nenhum tem status recebido, mantém ordem atual
+        if (!recebidoA && !recebidoB) return 0;
+        
+        // Ambos têm status recebido, compara timestamps
+        const dataA = timestampToDate(recebidoA.timestamp);
+        const dataB = timestampToDate(recebidoB.timestamp);
+        
+        if (!dataA || !dataB) return 0;
+        
+        // Ordena por data de recebimento conforme sortOrder
+        return sortOrder === 'oldest' 
+          ? dataA - dataB  // Mais antigos primeiro
+          : dataB - dataA; // Mais recentes primeiro
       });
       
       setAgendamentos(sortedAgendamentos);
@@ -80,11 +86,21 @@ const ProcessingInvoicesList = ({ refresh, onRefresh }) => {
   };
   
   const handleShowDetails = (agendamento) => {
+    console.log("Abrindo detalhes do agendamento:", agendamento.id);
     setSelectedAgendamento(agendamento);
   };
   
   const handleCloseDetails = () => {
     setSelectedAgendamento(null);
+  };
+  
+  const getDataRecebimento = (historicoStatus) => {
+    if (!historicoStatus || !Array.isArray(historicoStatus)) return '-';
+    
+    const recebido = historicoStatus.find(h => h.status === 'recebido');
+    if (!recebido) return '-';
+    
+    return formatarData(recebido.timestamp);
   };
   
   if (loading) {
@@ -93,7 +109,7 @@ const ProcessingInvoicesList = ({ refresh, onRefresh }) => {
   
   return (
     <div className="processing-invoices-list">
-      <h3>Notas em Processamento</h3>
+      <h3>Notas em Processamento {sortOrder === 'newest' && '(Mais recentes primeiro)'}</h3>
       {agendamentos.length === 0 ? (
         <p>Nenhuma nota em processamento</p>
       ) : (
@@ -109,8 +125,18 @@ const ProcessingInvoicesList = ({ refresh, onRefresh }) => {
                   NF: {item.numeroNF}
                 </span>
                 <span>Cliente: {item.cliente.nome}</span>
+                <span className="data-recebimento">
+                  Recebido em: {getDataRecebimento(item.historicoStatus)}
+                </span>
               </div>
               <div className="item-actions">
+                {(item.status === 'recebido' || item.status === 'informado') && (
+                  <button onClick={() => handleUpdateStatus(item.id, 'informado')}
+                    className="status-button informado-button">
+                    Informado
+                  </button>
+                )}
+                
                 {item.status === 'recebido' && (
                   <button onClick={() => handleUpdateStatus(item.id, 'em tratativa')}>
                     Em Tratativa

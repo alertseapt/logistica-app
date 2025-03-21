@@ -201,29 +201,51 @@ router.patch('/:id/status', async (req, res) => {
     const { id } = req.params;
     const { status } = req.body;
     
+    console.log(`[DEBUG] Tentando atualizar agendamento ${id} para status "${status}"`);
+    
     if (!status) {
+      console.log('[DEBUG] Erro: Status não informado');
       return res.status(400).json({ error: 'Status é obrigatório' });
     }
     
     // Validar se o status é permitido
-    const statusPermitidos = ['agendado', 'recebido', 'em tratativa', 'a paletizar', 'paletizado', 'fechado'];
+    const statusPermitidos = ['agendado', 'recebido', 'informado', 'em tratativa', 'a paletizar', 'paletizado', 'fechado'];
     if (!statusPermitidos.includes(status)) {
+      console.log(`[DEBUG] Erro: Status "${status}" não é permitido`);
       return res.status(400).json({ error: 'Status inválido' });
     }
     
     const agendamentoDoc = await agendamentosRef.doc(id).get();
     
     if (!agendamentoDoc.exists) {
+      console.log(`[DEBUG] Erro: Agendamento ${id} não encontrado`);
       return res.status(404).json({ error: 'Agendamento não encontrado' });
     }
     
     const agendamentoAtual = agendamentoDoc.data();
+    console.log(`[DEBUG] Status atual do agendamento ${id}: "${agendamentoAtual.status}"`);
+    
+    // Validar regras específicas para o status "informado"
+    if (status === 'informado') {
+      console.log(`[DEBUG] Validando regras para status "informado"`);
+      // O status "informado" só pode ser aplicado se o status atual for "recebido" ou "informado"
+      if (agendamentoAtual.status !== 'recebido' && agendamentoAtual.status !== 'informado') {
+        console.log(`[DEBUG] Erro: Não é possível alterar de "${agendamentoAtual.status}" para "informado"`);
+        return res.status(400).json({ 
+          error: `O status informado só pode ser aplicado a agendamentos com status recebido ou informado. Status atual: ${agendamentoAtual.status}` 
+        });
+      }
+      console.log(`[DEBUG] Validação bem-sucedida para status "informado"`);
+    }
     
     // Adiciona o novo status ao histórico com timestamp do servidor
+    const timestamp = admin.firestore.Timestamp.fromDate(new Date());
     const novoHistoricoItem = {
       status,
-      timestamp: admin.firestore.Timestamp.fromDate(new Date())
+      timestamp
     };
+    
+    console.log(`[DEBUG] Adicionando novo histórico: ${status} em ${timestamp.toDate()}`);
     
     const historicoStatus = [
       ...(agendamentoAtual.historicoStatus || []),
@@ -235,6 +257,8 @@ router.patch('/:id/status', async (req, res) => {
       historicoStatus
     });
     
+    console.log(`[DEBUG] Agendamento ${id} atualizado com sucesso para status "${status}"`);
+    
     // Recupera o agendamento atualizado
     const agendamentoAtualizado = await agendamentosRef.doc(id).get();
     
@@ -243,7 +267,7 @@ router.patch('/:id/status', async (req, res) => {
       ...agendamentoAtualizado.data()
     });
   } catch (error) {
-    console.error('Erro ao atualizar status do agendamento:', error);
+    console.error('[DEBUG] Erro ao atualizar status do agendamento:', error);
     res.status(500).json({ error: 'Erro ao atualizar status do agendamento' });
   }
 });

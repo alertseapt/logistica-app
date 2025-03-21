@@ -1,3 +1,4 @@
+// Arquivo api.js corrigido para o frontend
 import axios from 'axios';
 
 const api = axios.create({
@@ -25,8 +26,13 @@ export const updateAgendamento = async (id, agendamento) => {
 };
 
 export const updateAgendamentoStatus = async (id, status) => {
-  const response = await api.patch(`/agendamentos/${id}/status`, { status });
-  return response.data;
+  try {
+    const response = await api.patch(`/agendamentos/${id}/status`, { status });
+    return response.data;
+  } catch (error) {
+    console.error('Erro ao atualizar status:', error);
+    throw error;
+  }
 };
 
 export const deleteAgendamento = async (id) => {
