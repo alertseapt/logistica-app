@@ -5,7 +5,6 @@ import ProcessingInvoicesList from '../components/administrativo/ProcessingInvoi
 const AdministrativoPage = () => {
   const [refresh, setRefresh] = useState(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [sortOrder, setSortOrder] = useState('oldest'); // 'oldest' ou 'newest'
   
   const handleRefresh = () => {
     setRefresh(prev => prev + 1);
@@ -17,10 +16,6 @@ const AdministrativoPage = () => {
   
   const closeModal = () => {
     setIsModalOpen(false);
-  };
-  
-  const toggleSortOrder = () => {
-    setSortOrder(prev => prev === 'oldest' ? 'newest' : 'oldest');
   };
   
   return (
@@ -39,20 +34,9 @@ const AdministrativoPage = () => {
         onRefresh={handleRefresh}
       />
       
-      <div className="list-controls">
-        <button 
-          className="sort-button" 
-          onClick={toggleSortOrder}
-          title={sortOrder === 'oldest' ? 'Ordenar por data de recebimento mais recente' : 'Ordenar por data de recebimento mais antiga'}
-        >
-          {sortOrder === 'oldest' ? 'Mais antigos primeiro' : 'Mais recentes primeiro'}
-        </button>
-      </div>
-      
       <ProcessingInvoicesList 
         refresh={refresh} 
-        onRefresh={handleRefresh} 
-        sortOrder={sortOrder}
+        onRefresh={handleRefresh}
       />
     </div>
   );

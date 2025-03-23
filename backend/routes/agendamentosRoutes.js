@@ -104,11 +104,42 @@ router.post('/', async (req, res) => {
     
     const clienteData = clienteDoc.data();
     
+    // Normaliza a data para meio-dia (12:00) para evitar problemas de fuso horário
+    const normalizeDate = (dateInput) => {
+      if (!dateInput) return null;
+      
+      let dataObj;
+      
+      // Se for um objeto Date
+      if (dateInput instanceof Date) {
+        dataObj = dateInput;
+      } else {
+        // Se for uma string ISO ou timestamp
+        dataObj = new Date(dateInput);
+      }
+      
+      // Se a data é inválida, retorna null
+      if (isNaN(dataObj.getTime())) {
+        console.warn('Data inválida:', dateInput);
+        return null;
+      }
+      
+      // Cria uma nova data às 12:00 para evitar problemas de fuso horário
+      const normalizedDate = new Date(
+        dataObj.getFullYear(),
+        dataObj.getMonth(),
+        dataObj.getDate(),
+        12, 0, 0
+      );
+      
+      return admin.firestore.Timestamp.fromDate(normalizedDate);
+    };
+    
     // Cria o agendamento com status inicial "agendado"
     const novoAgendamento = {
       numeroNF: numeroNF || extrairNumeroNF(chaveAcesso || ''),
       chaveAcesso: chaveAcesso || '',
-      data: data ? admin.firestore.Timestamp.fromDate(new Date(data)) : null,
+      data: ePrevisao ? null : normalizeDate(data),
       ePrevisao: Boolean(ePrevisao),
       volumes: Number(volumes) || 0,
       clienteId,
@@ -123,6 +154,8 @@ router.post('/', async (req, res) => {
         timestamp: admin.firestore.Timestamp.fromDate(new Date())
       }]
     };
+    
+    console.log('Criando agendamento com data:', data, 'normalizada para:', novoAgendamento.data);
     
     const docRef = await agendamentosRef.add(novoAgendamento);
     
@@ -160,7 +193,19 @@ router.put('/:id', async (req, res) => {
     if (numeroNF) atualizacoes.numeroNF = numeroNF;
     if (chaveAcesso) atualizacoes.chaveAcesso = chaveAcesso;
     if (data !== undefined) {
-      atualizacoes.data = data ? admin.firestore.Timestamp.fromDate(new Date(data)) : null;
+      // Normaliza a data para meio-dia para evitar problemas de fuso horário
+      if (data) {
+        const dataObj = new Date(data);
+        const dataLocalNormalizada = new Date(
+          dataObj.getFullYear(),
+          dataObj.getMonth(),
+          dataObj.getDate(),
+          12, 0, 0
+        );
+        atualizacoes.data = admin.firestore.Timestamp.fromDate(dataLocalNormalizada);
+      } else {
+        atualizacoes.data = null;
+      }
     }
     if (ePrevisao !== undefined) atualizacoes.ePrevisao = Boolean(ePrevisao);
     if (volumes !== undefined) atualizacoes.volumes = Number(volumes);
@@ -236,6 +281,19 @@ router.patch('/:id/status', async (req, res) => {
         });
       }
       console.log(`[DEBUG] Validação bem-sucedida para status "informado"`);
+    }
+    
+    // Validação para transições de "informado" para outros status
+    if (agendamentoAtual.status === 'informado') {
+      // Permitir transições de "informado" para "em tratativa", "a paletizar" e "informado"
+      const transicoesPermitidas = ['informado', 'em tratativa', 'a paletizar'];
+      if (!transicoesPermitidas.includes(status)) {
+        console.log(`[DEBUG] Erro: Não é possível alterar de "informado" para "${status}"`);
+        return res.status(400).json({
+          error: `De status informado, só é possível alterar para: ${transicoesPermitidas.join(', ')}`
+        });
+      }
+      console.log(`[DEBUG] Transição de "informado" para "${status}" permitida`);
     }
     
     // Adiciona o novo status ao histórico com timestamp do servidor

@@ -3,26 +3,58 @@ import { getAgendamentos, updateAgendamentoStatus } from '../../services/api';
 import { formatarData } from '../../utils/nfUtils';
 import InvoiceDetailsModal from './InvoiceDetailsModal';
 
-const ProcessingInvoicesList = ({ refresh, onRefresh, sortOrder = 'oldest' }) => {
+const ProcessingInvoicesList = ({ refresh, onRefresh }) => {
   const [agendamentos, setAgendamentos] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedAgendamento, setSelectedAgendamento] = useState(null);
   
   useEffect(() => {
     fetchAgendamentos();
-  }, [refresh, sortOrder]);
+  }, [refresh]);
   
   // Função auxiliar para converter timestamp para Date
   const timestampToDate = (timestamp) => {
     if (!timestamp) return null;
     
-    // Se for um objeto Timestamp do Firestore
-    if (timestamp && typeof timestamp === 'object' && timestamp.seconds) {
-      return new Date(timestamp.seconds * 1000);
+    try {
+      // Formato específico com _seconds e _nanoseconds
+      if (timestamp && typeof timestamp === 'object' && 
+          (timestamp._seconds !== undefined || timestamp.seconds !== undefined)) {
+        
+        // Obter seconds do objeto, dependendo do formato
+        const seconds = timestamp._seconds !== undefined ? timestamp._seconds : timestamp.seconds;
+        
+        // Verificar se é um timestamp futuro (válido até 31/12/2024)
+        const currentYear = new Date().getFullYear();
+        const maxValidTimestamp = new Date(`${currentYear+1}-01-01`).getTime() / 1000;
+        
+        if (seconds > maxValidTimestamp) {
+          console.warn('Data futura inválida detectada:', timestamp);
+          return null;
+        }
+        
+        return new Date(seconds * 1000);
+      }
+      
+      // Se já for uma data ou string de data
+      const date = new Date(timestamp);
+      
+      // Verifica se a data é válida
+      if (isNaN(date.getTime())) {
+        console.warn('Formato de data inválido:', timestamp);
+        return null;
+      }
+      
+      return date;
+    } catch (error) {
+      console.error('Erro ao converter timestamp:', error, timestamp);
+      return null;
     }
-    
-    // Se já for uma data ou string de data
-    return new Date(timestamp);
+  };
+  
+  // Função para verificar se uma data é válida
+  const isValidDate = (date) => {
+    return date && !isNaN(date.getTime());
   };
   
   const fetchAgendamentos = async () => {
@@ -38,32 +70,35 @@ const ProcessingInvoicesList = ({ refresh, onRefresh, sortOrder = 'oldest' }) =>
       // Combina todos os resultados
       const combinedAgendamentos = responses.flat();
       
-      // Ordena por data de recebimento conforme a preferência do usuário
-      const sortedAgendamentos = combinedAgendamentos.sort((a, b) => {
-        // Primeiro verifica se ambos têm histórico de status
-        if (!a.historicoStatus || !b.historicoStatus) return 0;
-        
-        // Encontra o evento de recebimento no histórico
-        const recebidoA = a.historicoStatus.find(h => h.status === 'recebido');
-        const recebidoB = b.historicoStatus.find(h => h.status === 'recebido');
-        
-        // Se um tem status recebido e outro não, o que tem vem primeiro
-        if (recebidoA && !recebidoB) return -1;
-        if (!recebidoA && recebidoB) return 1;
-        
-        // Se nenhum tem status recebido, mantém ordem atual
-        if (!recebidoA && !recebidoB) return 0;
-        
-        // Ambos têm status recebido, compara timestamps
-        const dataA = timestampToDate(recebidoA.timestamp);
-        const dataB = timestampToDate(recebidoB.timestamp);
-        
-        if (!dataA || !dataB) return 0;
-        
-        // Ordena por data de recebimento conforme sortOrder
-        return sortOrder === 'oldest' 
-          ? dataA - dataB  // Mais antigos primeiro
-          : dataB - dataA; // Mais recentes primeiro
+      // Verifica se cada agendamento tem um status de recebimento no histórico
+      const agendamentosComData = combinedAgendamentos.map(agendamento => {
+        const recebido = agendamento.historicoStatus?.find(h => h.status === 'recebido');
+        const dataRecebimento = recebido ? timestampToDate(recebido.timestamp) : null;
+        return {
+          ...agendamento,
+          dataRecebimento
+        };
+      });
+      
+      // Filtra agendamentos sem data de recebimento
+      const comDataRecebimento = agendamentosComData.filter(a => isValidDate(a.dataRecebimento));
+      const semDataRecebimento = agendamentosComData.filter(a => !isValidDate(a.dataRecebimento));
+      
+      // Ordena os agendamentos com data de recebimento (mais antigo primeiro)
+      const ordenados = comDataRecebimento.sort((a, b) => {
+        return a.dataRecebimento - b.dataRecebimento;
+      });
+      
+      // Combina os ordenados com os sem data de recebimento
+      const sortedAgendamentos = [...ordenados, ...semDataRecebimento];
+      
+      console.log("Agendamentos ordenados por data de recebimento:");
+      sortedAgendamentos.forEach(a => {
+        if (isValidDate(a.dataRecebimento)) {
+          console.log(`NF: ${a.numeroNF || 'Sem NF'}, Status: ${a.status}, Data recebimento: ${a.dataRecebimento.toLocaleDateString()}`);
+        } else {
+          console.log(`NF: ${a.numeroNF || 'Sem NF'}, Status: ${a.status}, Sem data de recebimento válida`);
+        }
       });
       
       setAgendamentos(sortedAgendamentos);
@@ -76,12 +111,16 @@ const ProcessingInvoicesList = ({ refresh, onRefresh, sortOrder = 'oldest' }) =>
   
   const handleUpdateStatus = async (id, status) => {
     try {
+      console.log(`Tentando atualizar agendamento ${id} para status ${status}`);
       await updateAgendamentoStatus(id, status);
       await fetchAgendamentos();
       onRefresh();
     } catch (error) {
       console.error('Erro ao atualizar status:', error);
-      alert('Erro ao atualizar status');
+      if (error.response) {
+        console.error('Resposta do servidor:', error.response.data);
+      }
+      alert(`Erro ao atualizar status: ${error.message || 'Falha na requisição'}`);
     }
   };
   
@@ -102,6 +141,17 @@ const ProcessingInvoicesList = ({ refresh, onRefresh, sortOrder = 'oldest' }) =>
     
     return formatarData(recebido.timestamp);
   };
+
+  // Verifica se a NF deve ficar destacada em vermelho
+  const isNFHighlighted = (item) => {
+    // Verifica se não tem volume ou volume é zero
+    const semVolume = !item.volumes || item.volumes === 0;
+    
+    // Verifica se não tem chave de acesso
+    const semChaveAcesso = !item.chaveAcesso || item.chaveAcesso.trim() === '';
+    
+    return semVolume || semChaveAcesso;
+  };
   
   if (loading) {
     return <p>Carregando...</p>;
@@ -109,7 +159,8 @@ const ProcessingInvoicesList = ({ refresh, onRefresh, sortOrder = 'oldest' }) =>
   
   return (
     <div className="processing-invoices-list">
-      <h3>Notas em Processamento {sortOrder === 'newest' && '(Mais recentes primeiro)'}</h3>
+      <h3>Notas em Processamento</h3>
+      <p className="sorting-info">Ordenado por data de recebimento (mais antiga primeiro)</p>
       {agendamentos.length === 0 ? (
         <p>Nenhuma nota em processamento</p>
       ) : (
@@ -119,12 +170,12 @@ const ProcessingInvoicesList = ({ refresh, onRefresh, sortOrder = 'oldest' }) =>
               <div className="item-info">
                 <span className="status">{item.status}</span>
                 <span 
-                  className="numero-nf clickable"
+                  className={`numero-nf clickable ${isNFHighlighted(item) ? 'highlighted-nf' : ''}`}
                   onClick={() => handleShowDetails(item)}
                 >
-                  NF: {item.numeroNF}
+                  NF: {item.numeroNF || 'Sem NF'}
                 </span>
-                <span>Cliente: {item.cliente.nome}</span>
+                <span>Cliente: {item.cliente?.nome || 'Sem cliente'}</span>
                 <span className="data-recebimento">
                   Recebido em: {getDataRecebimento(item.historicoStatus)}
                 </span>
@@ -137,13 +188,13 @@ const ProcessingInvoicesList = ({ refresh, onRefresh, sortOrder = 'oldest' }) =>
                   </button>
                 )}
                 
-                {item.status === 'recebido' && (
+                {(item.status === 'recebido' || item.status === 'informado') && (
                   <button onClick={() => handleUpdateStatus(item.id, 'em tratativa')}>
                     Em Tratativa
                   </button>
                 )}
                 
-                {(item.status === 'recebido' || item.status === 'em tratativa') && (
+                {(item.status === 'recebido' || item.status === 'em tratativa' || item.status === 'informado') && (
                   <button onClick={() => handleUpdateStatus(item.id, 'a paletizar')}>
                     A Paletizar
                   </button>
@@ -164,6 +215,7 @@ const ProcessingInvoicesList = ({ refresh, onRefresh, sortOrder = 'oldest' }) =>
         <InvoiceDetailsModal
           agendamento={selectedAgendamento}
           onClose={handleCloseDetails}
+          onRefresh={fetchAgendamentos}
         />
       )}
     </div>

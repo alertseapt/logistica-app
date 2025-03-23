@@ -755,3 +755,192 @@ input, select, textarea {
 .historico li:has(.status:contains("informado")) {
   background-color: rgba(155, 89, 182, 0.1);
 }
+
+/* Adicione este estilo ao seu arquivo CSS */
+.sorting-info {
+  font-size: 0.9em;
+  color: #6c757d;
+  margin-top: -10px;
+  margin-bottom: 15px;
+  font-style: italic;
+}
+
+/* Adicione este estilo ao seu arquivo CSS */
+.highlighted-nf {
+  color: #e74c3c !important; /* Vermelho */
+  font-weight: bold;
+  position: relative;
+}
+
+/* Opcional: Adicionar um asterisco para chamar mais atenção */
+.highlighted-nf::after {
+  content: "*";
+  color: #e74c3c;
+  font-weight: bold;
+  position: relative;
+  font-size: 1.2em;
+  margin-left: 2px;
+  top: -2px;
+}
+
+
+/* Cabeçalho do modal com botões de ação */
+.modal-actions-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Botão de edição */
+.edit-button {
+  background-color: #3498db;
+  color: white;
+  border: none;
+  padding: 5px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+  font-size: 0.9em;
+}
+
+.edit-button:hover {
+  background-color: #2980b9;
+}
+
+/* Botão para cancelar edição */
+.cancel-edit-button {
+  background-color: #95a5a6;
+  color: white;
+  border: none;
+  padding: 5px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+  font-size: 0.9em;
+}
+
+.cancel-edit-button:hover {
+  background-color: #7f8c8d;
+}
+
+/* Botão para salvar alterações */
+.save-button {
+  background-color: #2ecc71;
+  color: white;
+  border: none;
+  padding: 8px 15px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+  margin-top: 15px;
+  width: 100%;
+  font-weight: 500;
+}
+
+.save-button:hover {
+  background-color: #27ae60;
+}
+
+.save-button:disabled {
+  background-color: #95a5a6;
+  cursor: not-allowed;
+}
+
+/* Formulário de edição */
+.edit-form {
+  margin-bottom: 20px;
+}
+
+.edit-form .form-group {
+  margin-bottom: 15px;
+}
+
+.edit-form label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: 500;
+  color: #555;
+}
+
+.edit-form input, 
+.edit-form textarea {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.edit-form textarea {
+  min-height: 80px;
+  resize: vertical;
+}
+
+/* Mensagem de feedback após salvar */
+.mensagem {
+  margin-top: 10px;
+  padding: 10px;
+  border-radius: 4px;
+  background-color: #f8f9fa;
+  border-left: 4px solid #3498db;
+  font-size: 0.9em;
+}
+
+/* Adicione estes estilos ao seu arquivo CSS */
+
+/* Container para o autocomplete */
+.autocomplete-container {
+  position: relative;
+}
+
+/* Estilização das sugestões */
+.suggestions {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  background-color: white;
+  border: 1px solid #ddd;
+  border-top: none;
+  border-radius: 0 0 4px 4px;
+  max-height: 200px;
+  overflow-y: auto;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Estilização de cada item de sugestão */
+.suggestion-item {
+  padding: 10px 15px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.suggestion-item:last-child {
+  border-bottom: none;
+}
+
+.suggestion-item:hover {
+  background-color: #f5f8fa;
+}
+
+/* Nome do cliente na sugestão */
+.suggestion-name {
+  font-weight: 500;
+}
+
+/* CNPJ do cliente na sugestão */
+.suggestion-cnpj {
+  font-size: 0.85em;
+  color: #7f8c8d;
+  margin-top: 3px;
+}
+
+/* Estilização do cliente selecionado */
+.selected-cliente {
+  margin-top: 5px;
+  font-size: 0.85em;
+  color: #27ae60;
+  font-weight: 500;
+}

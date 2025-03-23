@@ -7,15 +7,20 @@ const ScheduleCreationModal = ({ isOpen, onClose, onRefresh }) => {
   const [volumes, setVolumes] = useState('');
   const [data, setData] = useState('');
   const [ePrevisao, setEPrevisao] = useState(false);
+  const [marcarRecebido, setMarcarRecebido] = useState(false);
+  const [clienteSearch, setClienteSearch] = useState('');
   const [clienteId, setClienteId] = useState('');
   const [observacoes, setObservacoes] = useState('');
-  const [marcarRecebido, setMarcarRecebido] = useState(false);
   const [clientes, setClientes] = useState([]);
+  const [filteredClientes, setFilteredClientes] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const [loading, setLoading] = useState(false);
   const [mensagem, setMensagem] = useState('');
   
-  // Ref para o input da NF
+  // Refs
   const inputRef = useRef(null);
+  const clienteSearchRef = useRef(null);
+  const suggestionsRef = useRef(null);
   
   useEffect(() => {
     // Define a data atual como valor padrão
@@ -29,7 +34,37 @@ const ScheduleCreationModal = ({ isOpen, onClose, onRefresh }) => {
     if (isOpen && inputRef.current) {
       inputRef.current.focus();
     }
+    
+    // Adicionar event listener para fechar sugestões ao clicar fora
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
   }, [isOpen]);
+  
+  // Filtrar clientes quando o termo de busca muda
+  useEffect(() => {
+    if (clienteSearch.trim() === '') {
+      setFilteredClientes([]);
+      return;
+    }
+    
+    const lowerCaseSearch = clienteSearch.toLowerCase();
+    const filtered = clientes.filter(cliente => 
+      cliente.nome.toLowerCase().includes(lowerCaseSearch) ||
+      cliente.cnpj.toLowerCase().includes(lowerCaseSearch)
+    );
+    
+    setFilteredClientes(filtered);
+    setShowSuggestions(filtered.length > 0);
+  }, [clienteSearch, clientes]);
+  
+  const handleClickOutside = (event) => {
+    if (suggestionsRef.current && !suggestionsRef.current.contains(event.target) &&
+        clienteSearchRef.current && !clienteSearchRef.current.contains(event.target)) {
+      setShowSuggestions(false);
+    }
+  };
   
   const fetchClientes = async () => {
     try {
@@ -38,6 +73,12 @@ const ScheduleCreationModal = ({ isOpen, onClose, onRefresh }) => {
     } catch (error) {
       console.error('Erro ao carregar clientes:', error);
     }
+  };
+  
+  const handleSelectCliente = (cliente) => {
+    setClienteSearch(cliente.nome);
+    setClienteId(cliente.id);
+    setShowSuggestions(false);
   };
   
   const handleSubmit = async (e) => {
@@ -64,7 +105,13 @@ const ScheduleCreationModal = ({ isOpen, onClose, onRefresh }) => {
       const novoAgendamento = {
         numeroNF,
         chaveAcesso,
-        data: ePrevisao ? null : data,
+        data: ePrevisao ? null : (() => {
+          // Converte a string de data para um objeto Date com hora zerada
+          const [ano, mes, dia] = data.split('-').map(Number);
+          // Cria uma data com o fuso horário local, às 12:00 (meio-dia)
+          // Isso evita problemas de mudança de dia devido ao fuso horário
+          return new Date(ano, mes - 1, dia, 12, 0, 0);
+        })(),
         ePrevisao,
         volumes: Number(volumes) || 0,
         clienteId,
@@ -87,6 +134,7 @@ const ScheduleCreationModal = ({ isOpen, onClose, onRefresh }) => {
       setData(new Date().toISOString().split('T')[0]);
       setEPrevisao(false);
       setClienteId('');
+      setClienteSearch('');
       setObservacoes('');
       setMarcarRecebido(false);
       
@@ -137,20 +185,47 @@ const ScheduleCreationModal = ({ isOpen, onClose, onRefresh }) => {
               />
             </div>
             
-            <div className="form-group">
+            <div className="form-group autocomplete-container">
               <label>Cliente</label>
-              <select
-                value={clienteId}
-                onChange={(e) => setClienteId(e.target.value)}
+              <input
+                type="text"
+                value={clienteSearch}
+                onChange={(e) => {
+                  setClienteSearch(e.target.value);
+                  if (e.target.value.trim() === '') {
+                    setClienteId('');
+                  }
+                }}
+                onFocus={() => {
+                  if (clienteSearch.trim() !== '' && filteredClientes.length > 0) {
+                    setShowSuggestions(true);
+                  }
+                }}
+                placeholder="Digite o nome ou CNPJ do cliente"
                 required
-              >
-                <option value="">Selecione um cliente</option>
-                {clientes.map(cliente => (
-                  <option key={cliente.id} value={cliente.id}>
-                    {cliente.nome}
-                  </option>
-                ))}
-              </select>
+                ref={clienteSearchRef}
+              />
+              
+              {showSuggestions && (
+                <div className="suggestions" ref={suggestionsRef}>
+                  {filteredClientes.map(cliente => (
+                    <div 
+                      key={cliente.id} 
+                      className="suggestion-item"
+                      onClick={() => handleSelectCliente(cliente)}
+                    >
+                      <div className="suggestion-name">{cliente.nome}</div>
+                      <div className="suggestion-cnpj">{cliente.cnpj}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              
+              {clienteId && clienteSearch && (
+                <div className="selected-cliente">
+                  Cliente selecionado: {clientes.find(c => c.id === clienteId)?.nome}
+                </div>
+              )}
             </div>
             
             <div className="form-group checkbox">

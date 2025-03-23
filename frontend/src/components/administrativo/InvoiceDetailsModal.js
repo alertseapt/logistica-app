@@ -1,7 +1,18 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { formatarData, formatarDataHora } from '../../utils/nfUtils';
+import { updateAgendamento } from '../../services/api';
 
-const InvoiceDetailsModal = ({ agendamento, onClose }) => {
+const InvoiceDetailsModal = ({ agendamento, onClose, onRefresh }) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedData, setEditedData] = useState({
+    numeroNF: agendamento?.numeroNF || '',
+    chaveAcesso: agendamento?.chaveAcesso || '',
+    volumes: agendamento?.volumes || 0,
+    observacoes: agendamento?.observacoes || ''
+  });
+  const [saving, setSaving] = useState(false);
+  const [mensagem, setMensagem] = useState('');
+  
   if (!agendamento) return null;
   
   // Função para lidar com o evento de clique no overlay
@@ -12,6 +23,44 @@ const InvoiceDetailsModal = ({ agendamento, onClose }) => {
     }
   };
   
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    
+    // Converter volumes para número
+    if (name === 'volumes') {
+      setEditedData(prev => ({
+        ...prev,
+        [name]: value === '' ? '' : Number(value)
+      }));
+    } else {
+      setEditedData(prev => ({
+        ...prev,
+        [name]: value
+      }));
+    }
+  };
+  
+  const handleSaveChanges = async () => {
+    setSaving(true);
+    setMensagem('');
+    
+    try {
+      await updateAgendamento(agendamento.id, editedData);
+      setMensagem('Informações atualizadas com sucesso!');
+      setIsEditing(false);
+      
+      // Notifica o componente pai para atualizar a lista
+      if (onRefresh) {
+        onRefresh();
+      }
+    } catch (error) {
+      console.error('Erro ao atualizar agendamento:', error);
+      setMensagem('Erro ao atualizar informações');
+    } finally {
+      setSaving(false);
+    }
+  };
+  
   console.log("Renderizando modal para agendamento:", agendamento.id);
   
   return (
@@ -19,56 +68,137 @@ const InvoiceDetailsModal = ({ agendamento, onClose }) => {
       <div className="modal-content">
         <div className="modal-header">
           <h3>Detalhes da Nota Fiscal</h3>
-          <button className="close-button" onClick={onClose}>×</button>
+          <div className="modal-actions-header">
+            {!isEditing ? (
+              <button 
+                className="edit-button" 
+                onClick={() => setIsEditing(true)}
+              >
+                Editar
+              </button>
+            ) : (
+              <button 
+                className="cancel-edit-button" 
+                onClick={() => {
+                  setIsEditing(false);
+                  setEditedData({
+                    numeroNF: agendamento.numeroNF || '',
+                    chaveAcesso: agendamento.chaveAcesso || '',
+                    volumes: agendamento.volumes || 0,
+                    observacoes: agendamento.observacoes || ''
+                  });
+                  setMensagem('');
+                }}
+              >
+                Cancelar Edição
+              </button>
+            )}
+            <button className="close-button" onClick={onClose}>×</button>
+          </div>
         </div>
         
         <div className="modal-body">
-          <div className="detail-row">
-            <span className="label">Número da NF:</span>
-            <span className="value">{agendamento.numeroNF}</span>
-          </div>
-          
-          {agendamento.chaveAcesso && (
-            <div className="detail-row">
-              <span className="label">Chave de Acesso:</span>
-              <span className="value">{agendamento.chaveAcesso}</span>
+          {isEditing ? (
+            <div className="edit-form">
+              <div className="form-group">
+                <label>Número da NF:</label>
+                <input
+                  type="text"
+                  name="numeroNF"
+                  value={editedData.numeroNF}
+                  onChange={handleInputChange}
+                />
+              </div>
+              
+              <div className="form-group">
+                <label>Chave de Acesso:</label>
+                <input
+                  type="text"
+                  name="chaveAcesso"
+                  value={editedData.chaveAcesso}
+                  onChange={handleInputChange}
+                  placeholder="Informe a chave de acesso"
+                />
+              </div>
+              
+              <div className="form-group">
+                <label>Volumes:</label>
+                <input
+                  type="number"
+                  name="volumes"
+                  value={editedData.volumes}
+                  onChange={handleInputChange}
+                  min="0"
+                />
+              </div>
+              
+              <div className="form-group">
+                <label>Observações:</label>
+                <textarea
+                  name="observacoes"
+                  value={editedData.observacoes}
+                  onChange={handleInputChange}
+                  rows="3"
+                  placeholder="Observações adicionais"
+                />
+              </div>
+              
+              <button 
+                className="save-button" 
+                onClick={handleSaveChanges}
+                disabled={saving}
+              >
+                {saving ? 'Salvando...' : 'Salvar Alterações'}
+              </button>
+              
+              {mensagem && <p className="mensagem">{mensagem}</p>}
             </div>
-          )}
-          
-          <div className="detail-row">
-            <span className="label">Cliente:</span>
-            <span className="value">{agendamento.cliente?.nome || '-'}</span>
-          </div>
-          
-          <div className="detail-row">
-            <span className="label">CNPJ:</span>
-            <span className="value">{agendamento.cliente?.cnpj || '-'}</span>
-          </div>
-          
-          <div className="detail-row">
-            <span className="label">Status:</span>
-            <span className="value">{agendamento.status}</span>
-          </div>
-          
-          <div className="detail-row">
-            <span className="label">Volumes:</span>
-            <span className="value">{agendamento.volumes}</span>
-          </div>
-          
-          <div className="detail-row">
-            <span className="label">Data:</span>
-            <span className="value">
-              {agendamento.ePrevisao 
-                ? 'Previsão (sem data específica)' 
-                : formatarData(agendamento.data)}
-            </span>
-          </div>
-          
-          {agendamento.observacoes && (
-            <div className="detail-row">
-              <span className="label">Observações:</span>
-              <span className="value">{agendamento.observacoes}</span>
-            </div>
+          ) : (
+            <>
+              <div className="detail-row">
+                <span className="label">Número da NF:</span>
+                <span className="value">{agendamento.numeroNF || '-'}</span>
+              </div>
+              
+              <div className="detail-row">
+                <span className="label">Chave de Acesso:</span>
+                <span className="value">{agendamento.chaveAcesso || '-'}</span>
+              </div>
+              
+              <div className="detail-row">
+                <span className="label">Cliente:</span>
+                <span className="value">{agendamento.cliente?.nome || '-'}</span>
+              </div>
+              
+              <div className="detail-row">
+                <span className="label">CNPJ:</span>
+                <span className="value">{agendamento.cliente?.cnpj || '-'}</span>
+              </div>
+              
+              <div className="detail-row">
+                <span className="label">Status:</span>
+                <span className="value">{agendamento.status}</span>
+              </div>
+              
+              <div className="detail-row">
+                <span className="label">Volumes:</span>
+                <span className="value">{agendamento.volumes !== undefined ? agendamento.volumes : '-'}</span>
+              </div>
+              
+              <div className="detail-row">
+                <span className="label">Data:</span>
+                <span className="value">
+                  {agendamento.ePrevisao 
+                    ? 'Previsão (sem data específica)' 
+                    : formatarData(agendamento.data)}
+                </span>
+              </div>
+              
+              <div className="detail-row">
+                <span className="label">Observações:</span>
+                <span className="value">{agendamento.observacoes || '-'}</span>
+              </div>
+            </>
           )}
           
           <div className="historico">
