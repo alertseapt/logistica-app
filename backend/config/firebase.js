@@ -1,27 +1,37 @@
 const admin = require('firebase-admin');
-require('dotenv').config();
 
-// Criar objeto de configuração a partir das variáveis de ambiente
-const serviceAccount = {
-  type: process.env.FIREBASE_TYPE,
-  project_id: process.env.FIREBASE_PROJECT_ID,
-  private_key_id: process.env.FIREBASE_PRIVATE_KEY_ID,
-  private_key: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-  client_email: process.env.FIREBASE_CLIENT_EMAIL,
-  client_id: process.env.FIREBASE_CLIENT_ID,
-  auth_uri: process.env.FIREBASE_AUTH_URI,
-  token_uri: process.env.FIREBASE_TOKEN_URI,
-  auth_provider_x509_cert_url: process.env.FIREBASE_AUTH_PROVIDER_CERT_URL,
-  client_x509_cert_url: process.env.FIREBASE_CLIENT_CERT_URL,
-  universe_domain: process.env.FIREBASE_UNIVERSE_DOMAIN
-};
+// Inicializa o Firebase Admin com as credenciais do serviceAccount
+let serviceAccount;
 
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount)
-});
+// Verifica se as credenciais estão nas variáveis de ambiente (para ambiente de produção)
+if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+  serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+} else {
+  // Caso contrário, carrega do arquivo local (para ambiente de desenvolvimento)
+  try {
+    serviceAccount = require('./serviceAccountKey.json');
+  } catch (error) {
+    console.error('Erro ao carregar serviceAccountKey.json:', error);
+    console.error('Certifique-se de que o arquivo existe ou configure a variável de ambiente FIREBASE_SERVICE_ACCOUNT');
+    process.exit(1);
+  }
+}
 
+// Inicializa o Firebase Admin com as credenciais
+try {
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount)
+  });
+} catch (error) {
+  console.error('Erro ao inicializar Firebase Admin:', error);
+  process.exit(1);
+}
+
+// Obtém referência para o Firestore
 const db = admin.firestore();
+
+// Referências para as coleções
 const agendamentosRef = db.collection('agendamentos');
 const clientesRef = db.collection('clientes');
 
-module.exports = { db, agendamentosRef, clientesRef };
+module.exports = { db, admin, agendamentosRef, clientesRef };
