@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { getAgendamentos, updateAgendamentoStatus } from '../../services/api';
 import { formatarData, timestampToDate } from '../../utils/nfUtils';
+import InvoiceDetailsModal from '../administrativo/InvoiceDetailsModal';
 
 const ToBePalletizedList = ({ refresh, onRefresh }) => {
   const [agendamentos, setAgendamentos] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [selectedAgendamento, setSelectedAgendamento] = useState(null);
+  const [loadingActions, setLoadingActions] = useState({});
   
   useEffect(() => {
     fetchAgendamentos();
@@ -40,6 +43,8 @@ const ToBePalletizedList = ({ refresh, onRefresh }) => {
   };
   
   const handleUpdateStatus = async (id, status) => {
+    setLoadingActions(prev => ({ ...prev, [id]: true }));
+    
     try {
       await updateAgendamentoStatus(id, status);
       setAgendamentos(agendamentos.filter(item => item.id !== id));
@@ -47,7 +52,17 @@ const ToBePalletizedList = ({ refresh, onRefresh }) => {
     } catch (error) {
       console.error('Erro ao atualizar status:', error);
       alert('Erro ao atualizar status');
+    } finally {
+      setLoadingActions(prev => ({ ...prev, [id]: false }));
     }
+  };
+  
+  const handleShowDetails = (agendamento) => {
+    setSelectedAgendamento(agendamento);
+  };
+  
+  const handleCloseDetails = () => {
+    setSelectedAgendamento(null);
   };
   
   if (loading) {
@@ -60,18 +75,37 @@ const ToBePalletizedList = ({ refresh, onRefresh }) => {
       {agendamentos.length === 0 ? (
         <p>Nenhum agendamento a paletizar</p>
       ) : (
-        <ul>
+        <ul className="horizontal-list">
           {agendamentos.map(item => (
             <li key={item.id}>
-              <span>NF: {item.numeroNF}</span>
-              <span>Cliente: {item.cliente.nome}</span>
-              <span>Volumes: {item.volumes}</span>
-              <button onClick={() => handleUpdateStatus(item.id, 'paletizado')}>
-                Paletizado
-              </button>
+              <div className="item-content">
+                <div className="item-info-horizontal">
+                  <span className="item-nf">NF: <span 
+                    className="clickable" 
+                    onClick={() => handleShowDetails(item)}
+                  >{item.numeroNF}</span></span>
+                  <span className="item-cliente">Cliente: {item.cliente.nome}</span>
+                  <span className="item-volumes">Volumes: {item.volumes}</span>
+                </div>
+                <button 
+                  onClick={() => handleUpdateStatus(item.id, 'paletizado')}
+                  disabled={loadingActions[item.id]}
+                  className={loadingActions[item.id] ? 'loading' : ''}
+                >
+                  {loadingActions[item.id] ? 'Processando...' : 'Paletizado'}
+                </button>
+              </div>
             </li>
           ))}
         </ul>
+      )}
+      
+      {selectedAgendamento && (
+        <InvoiceDetailsModal
+          agendamento={selectedAgendamento}
+          onClose={handleCloseDetails}
+          onRefresh={onRefresh}
+        />
       )}
     </div>
   );

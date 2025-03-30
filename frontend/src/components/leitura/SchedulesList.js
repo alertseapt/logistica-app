@@ -1,7 +1,28 @@
-import React from 'react';
-import { formatarData } from '../../utils/nfUtils';
+import React, { useState } from 'react';
+import { formatarData, formatarDataHora } from '../../utils/nfUtils';
+import InvoiceDetailsModal from '../administrativo/InvoiceDetailsModal';
 
 const SchedulesList = ({ agendamentos, loading }) => {
+  const [selectedAgendamento, setSelectedAgendamento] = useState(null);
+  
+  const handleShowDetails = (agendamento) => {
+    setSelectedAgendamento(agendamento);
+  };
+  
+  const handleCloseDetails = () => {
+    setSelectedAgendamento(null);
+  };
+  
+  // Helper function to get the received date and time
+  const getDataRecebimento = (historicoStatus) => {
+    if (!historicoStatus || !Array.isArray(historicoStatus)) return '-';
+    
+    const recebido = historicoStatus.find(h => h.status === 'recebido');
+    if (!recebido) return '-';
+    
+    return formatarDataHora(recebido.timestamp);
+  };
+  
   if (loading) {
     return <p>Carregando...</p>;
   }
@@ -20,12 +41,20 @@ const SchedulesList = ({ agendamentos, loading }) => {
             <th>Data</th>
             <th>Volumes</th>
             <th>Status</th>
+            <th>Recebido em</th>
           </tr>
         </thead>
         <tbody>
           {agendamentos.map(item => (
             <tr key={item.id} className={`status-${item.status.replace(/\s+/g, '-')}`}>
-              <td>{item.numeroNF}</td>
+              <td>
+                <span 
+                  className="clickable" 
+                  onClick={() => handleShowDetails(item)}
+                >
+                  {item.numeroNF}
+                </span>
+              </td>
               <td>{item.cliente ? item.cliente.nome : '-'}</td>
               <td>
                 {item.ePrevisao 
@@ -34,10 +63,19 @@ const SchedulesList = ({ agendamentos, loading }) => {
               </td>
               <td>{item.volumes}</td>
               <td>{item.status}</td>
+              <td>{getDataRecebimento(item.historicoStatus)}</td>
             </tr>
           ))}
         </tbody>
       </table>
+      
+      {selectedAgendamento && (
+        <InvoiceDetailsModal
+          agendamento={selectedAgendamento}
+          onClose={handleCloseDetails}
+          onRefresh={() => {}} // No refresh function needed here
+        />
+      )}
     </div>
   );
 };

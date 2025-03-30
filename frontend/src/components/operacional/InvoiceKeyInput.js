@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
 import { searchAgendamentos, updateAgendamentoStatus, updateAgendamento } from '../../services/api';
 import { extrairNumeroNF, formatarData } from '../../utils/nfUtils';
+import InvoiceDetailsModal from '../administrativo/InvoiceDetailsModal';
 
 const InvoiceKeyInput = ({ onRefresh }) => {
   const [chaveAcesso, setChaveAcesso] = useState('');
   const [resultados, setResultados] = useState([]);
   const [mensagem, setMensagem] = useState('');
   const [loading, setLoading] = useState(false);
+  const [selectedAgendamento, setSelectedAgendamento] = useState(null);
+  const [loadingActions, setLoadingActions] = useState({});
   
   const handleKeyPress = async (e) => {
     if (e.key === 'Enter') {
@@ -35,6 +38,8 @@ const InvoiceKeyInput = ({ onRefresh }) => {
   };
   
   const handleReceberNota = async (id, agendamento) => {
+    setLoadingActions(prev => ({ ...prev, [id]: true }));
+    
     try {
       // Verificar se é uma chave de acesso (44 dígitos) e se o agendamento ainda não tem chave
       if (chaveAcesso.length === 44 && /^\d+$/.test(chaveAcesso) && 
@@ -62,7 +67,17 @@ const InvoiceKeyInput = ({ onRefresh }) => {
     } catch (error) {
       console.error('Erro ao receber nota:', error);
       setMensagem(`Erro ao receber nota: ${error.message}`);
+    } finally {
+      setLoadingActions(prev => ({ ...prev, [id]: false }));
     }
+  };
+  
+  const handleShowDetails = (agendamento) => {
+    setSelectedAgendamento(agendamento);
+  };
+  
+  const handleCloseDetails = () => {
+    setSelectedAgendamento(null);
   };
   
   return (
@@ -87,16 +102,31 @@ const InvoiceKeyInput = ({ onRefresh }) => {
           <ul>
             {resultados.map(item => (
               <li key={item.id}>
-                <span>NF: {item.numeroNF}</span>
+                <span>NF: <span 
+                  className="clickable" 
+                  onClick={() => handleShowDetails(item)}
+                >{item.numeroNF}</span></span>
                 <span>Cliente: {item.cliente.nome}</span>
                 <span>Data: {formatarData(item.data)}</span>
-                <button onClick={() => handleReceberNota(item.id, item)}>
-                  Receber
+                <button 
+                  onClick={() => handleReceberNota(item.id, item)}
+                  disabled={loadingActions[item.id]}
+                  className={loadingActions[item.id] ? 'loading' : ''}
+                >
+                  {loadingActions[item.id] ? 'Processando...' : 'Receber'}
                 </button>
               </li>
             ))}
           </ul>
         </div>
+      )}
+      
+      {selectedAgendamento && (
+        <InvoiceDetailsModal
+          agendamento={selectedAgendamento}
+          onClose={handleCloseDetails}
+          onRefresh={onRefresh}
+        />
       )}
     </div>
   );

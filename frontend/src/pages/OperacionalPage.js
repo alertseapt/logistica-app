@@ -17,9 +17,12 @@ const OperacionalPage = () => {
       
       <InvoiceKeyInput onRefresh={handleRefresh} />
       
-      <div className="lists-container">
+      <div className="top-lists-container">
         <ToBePalletizedList refresh={refresh} onRefresh={handleRefresh} />
         <TodaySchedulesList refresh={refresh} />
+      </div>
+      
+      <div className="bottom-list-container">
         <ForecastsList refresh={refresh} />
       </div>
     </div>

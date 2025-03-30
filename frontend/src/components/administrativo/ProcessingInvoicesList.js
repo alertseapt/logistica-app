@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { getAgendamentos, updateAgendamentoStatus } from '../../services/api';
-import { formatarData } from '../../utils/nfUtils';
+import { formatarData, timestampToDate } from '../../utils/nfUtils';
 import InvoiceDetailsModal from './InvoiceDetailsModal';
 
 const ProcessingInvoicesList = ({ refresh, onRefresh }) => {
   const [agendamentos, setAgendamentos] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedAgendamento, setSelectedAgendamento] = useState(null);
+  const [loadingActions, setLoadingActions] = useState({});
   
   useEffect(() => {
     fetchAgendamentos();
@@ -111,6 +112,9 @@ const ProcessingInvoicesList = ({ refresh, onRefresh }) => {
   
   const handleUpdateStatus = async (id, status) => {
     try {
+      // Set loading state for this specific action
+      setLoadingActions(prev => ({ ...prev, [`${id}-${status}`]: true }));
+      
       console.log(`Tentando atualizar agendamento ${id} para status ${status}`);
       await updateAgendamentoStatus(id, status);
       await fetchAgendamentos();
@@ -121,6 +125,9 @@ const ProcessingInvoicesList = ({ refresh, onRefresh }) => {
         console.error('Resposta do servidor:', error.response.data);
       }
       alert(`Erro ao atualizar status: ${error.message || 'Falha na requisição'}`);
+    } finally {
+      // Clear loading state
+      setLoadingActions(prev => ({ ...prev, [`${id}-${status}`]: false }));
     }
   };
   
@@ -182,27 +189,42 @@ const ProcessingInvoicesList = ({ refresh, onRefresh }) => {
               </div>
               <div className="item-actions">
                 {(item.status === 'recebido' || item.status === 'informado') && (
-                  <button onClick={() => handleUpdateStatus(item.id, 'informado')}
-                    className="status-button informado-button">
-                    Informado
+                  <button 
+                    onClick={() => handleUpdateStatus(item.id, 'informado')}
+                    className={`status-button informado-button ${loadingActions[`${item.id}-informado`] ? 'loading' : ''}`}
+                    disabled={loadingActions[`${item.id}-informado`]}
+                  >
+                    {loadingActions[`${item.id}-informado`] ? 'Processando...' : 'Informado'}
                   </button>
                 )}
                 
                 {(item.status === 'recebido' || item.status === 'informado') && (
-                  <button onClick={() => handleUpdateStatus(item.id, 'em tratativa')}>
-                    Em Tratativa
+                  <button 
+                    onClick={() => handleUpdateStatus(item.id, 'em tratativa')}
+                    className={loadingActions[`${item.id}-em tratativa`] ? 'loading' : ''}
+                    disabled={loadingActions[`${item.id}-em tratativa`]}
+                  >
+                    {loadingActions[`${item.id}-em tratativa`] ? 'Processando...' : 'Em Tratativa'}
                   </button>
                 )}
                 
                 {(item.status === 'recebido' || item.status === 'em tratativa' || item.status === 'informado') && (
-                  <button onClick={() => handleUpdateStatus(item.id, 'a paletizar')}>
-                    A Paletizar
+                  <button 
+                    onClick={() => handleUpdateStatus(item.id, 'a paletizar')}
+                    className={loadingActions[`${item.id}-a paletizar`] ? 'loading' : ''}
+                    disabled={loadingActions[`${item.id}-a paletizar`]}
+                  >
+                    {loadingActions[`${item.id}-a paletizar`] ? 'Processando...' : 'A Paletizar'}
                   </button>
                 )}
                 
                 {item.status === 'paletizado' && (
-                  <button onClick={() => handleUpdateStatus(item.id, 'fechado')}>
-                    Finalizar
+                  <button 
+                    onClick={() => handleUpdateStatus(item.id, 'fechado')}
+                    className={loadingActions[`${item.id}-fechado`] ? 'loading' : ''}
+                    disabled={loadingActions[`${item.id}-fechado`]}
+                  >
+                    {loadingActions[`${item.id}-fechado`] ? 'Processando...' : 'Finalizar'}
                   </button>
                 )}
               </div>

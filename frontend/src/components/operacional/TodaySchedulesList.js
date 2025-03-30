@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { getAgendamentos } from '../../services/api';
 import { formatarData, timestampToDate } from '../../utils/nfUtils';
+import InvoiceDetailsModal from '../administrativo/InvoiceDetailsModal';
 
 const TodaySchedulesList = ({ refresh }) => {
   const [agendamentos, setAgendamentos] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [selectedAgendamento, setSelectedAgendamento] = useState(null);
   
   useEffect(() => {
     fetchAgendamentos();
@@ -42,6 +44,14 @@ const TodaySchedulesList = ({ refresh }) => {
     }
   };
   
+  const handleShowDetails = (agendamento) => {
+    setSelectedAgendamento(agendamento);
+  };
+  
+  const handleCloseDetails = () => {
+    setSelectedAgendamento(null);
+  };
+  
   if (loading) {
     return <p>Carregando...</p>;
   }
@@ -52,15 +62,28 @@ const TodaySchedulesList = ({ refresh }) => {
       {agendamentos.length === 0 ? (
         <p>Nenhum agendamento para hoje</p>
       ) : (
-        <ul>
+        <ul className="horizontal-list">
           {agendamentos.map(item => (
             <li key={item.id}>
-              <span>NF: {item.numeroNF}</span>
-              <span>Cliente: {item.cliente.nome}</span>
-              <span>Volumes: {item.volumes}</span>
+              <div className="item-info-horizontal">
+                <span className="item-nf">NF: <span 
+                  className="clickable" 
+                  onClick={() => handleShowDetails(item)}
+                >{item.numeroNF}</span></span>
+                <span className="item-cliente">Cliente: {item.cliente.nome}</span>
+                <span className="item-volumes">Volumes: {item.volumes}</span>
+              </div>
             </li>
           ))}
         </ul>
+      )}
+      
+      {selectedAgendamento && (
+        <InvoiceDetailsModal
+          agendamento={selectedAgendamento}
+          onClose={handleCloseDetails}
+          onRefresh={fetchAgendamentos}
+        />
       )}
     </div>
   );
