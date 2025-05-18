@@ -19,4 +19,4 @@ app.use('/api/clientes', clientesRoutes);
 
 app.listen(PORT, () => {
   console.log(`Servidor rodando na porta ${PORT}`);
-});
+}); 
