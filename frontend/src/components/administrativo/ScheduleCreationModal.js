@@ -46,14 +46,16 @@ const ScheduleCreationModal = ({ isOpen, onClose, onRefresh }) => {
   useEffect(() => {
     if (clienteSearch.trim() === '') {
       setFilteredClientes([]);
+      setShowSuggestions(false);
       return;
     }
     
     const lowerCaseSearch = clienteSearch.toLowerCase();
-    const filtered = clientes.filter(cliente => 
-      cliente.nome.toLowerCase().includes(lowerCaseSearch) ||
-      cliente.cnpj.toLowerCase().includes(lowerCaseSearch)
-    );
+    const filtered = clientes.filter(cliente => {
+      const nomeMatch = cliente && typeof cliente.nome === 'string' && cliente.nome.toLowerCase().includes(lowerCaseSearch);
+      const cnpjMatch = cliente && typeof cliente.cnpj === 'string' && cliente.cnpj.toLowerCase().includes(lowerCaseSearch);
+      return nomeMatch || cnpjMatch;
+    });
     
     setFilteredClientes(filtered);
     setShowSuggestions(filtered.length > 0);
