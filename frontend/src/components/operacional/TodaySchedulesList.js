@@ -52,15 +52,26 @@ const TodaySchedulesList = ({ refresh }) => {
       {agendamentos.length === 0 ? (
         <p>Nenhum agendamento para hoje</p>
       ) : (
-        <ul>
+        <div className="agendamentos-container">
           {agendamentos.map(item => (
-            <li key={item.id}>
+            <div 
+              key={item.id} 
+              style={{ 
+                display: 'flex',
+                alignItems: 'center',
+                gap: '20px',
+                padding: '10px',
+                backgroundColor: '#f5f5f5',
+                borderRadius: '4px',
+                marginBottom: '10px'
+              }}
+            >
               <span>NF: {item.numeroNF}</span>
-              <span>Cliente: {item.cliente.nome}</span>
-              <span>Volumes: {item.volumes}</span>
-            </li>
+              <span>{item.cliente.nome}</span>
+              <span>VOL: {item.volumes}</span>
+            </div>
           ))}
-        </ul>
+        </div>
       )}
     </div>
   );

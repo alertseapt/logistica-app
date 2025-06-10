@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import SearchInput from '../components/leitura/SearchInput';
 import FilterControls from '../components/leitura/FilterControls';
 import SchedulesList from '../components/leitura/SchedulesList';
+import InvoiceDetailsModal from '../components/administrativo/InvoiceDetailsModal';
 import { getAgendamentos } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { timestampToDate } from '../utils/nfUtils';
@@ -11,6 +12,8 @@ const LeituraPage = () => {
   const [filteredAgendamentos, setFilteredAgendamentos] = useState([]);
   const [searchResults, setSearchResults] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [totalVolumes, setTotalVolumes] = useState(0);
+  const [selectedAgendamento, setSelectedAgendamento] = useState(null);
   const { ambienteChanged, resetAmbienteChanged } = useAuth();
   
   // Carrega os agendamentos iniciais e quando o ambiente muda para Leitura
@@ -22,6 +25,11 @@ const LeituraPage = () => {
       resetAmbienteChanged();
     }
   }, [ambienteChanged]); // Adiciona ambienteChanged como dependência
+  
+  useEffect(() => {
+    const total = filteredAgendamentos.reduce((acc, agendamento) => acc + (Number(agendamento.volumes) || 0), 0);
+    setTotalVolumes(total);
+  }, [filteredAgendamentos]);
   
   const fetchAgendamentos = async () => {
     setLoading(true);
@@ -37,9 +45,9 @@ const LeituraPage = () => {
       
       // Aplica os filtros padrão (mês atual)
       const hoje = new Date();
-      const mesAtual = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`;
+      const primeiroDiaDoMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
       
-      applyDefaultFilters(response, mesAtual);
+      applyDefaultFilters(response, primeiroDiaDoMes, hoje);
     } catch (error) {
       console.error('Erro ao buscar agendamentos:', error);
     } finally {
@@ -48,12 +56,14 @@ const LeituraPage = () => {
   };
   
   // Aplica os filtros padrão aos agendamentos
-  const applyDefaultFilters = (agendamentosList, mes) => {
+  const applyDefaultFilters = (agendamentosList, dataInicial, dataFinal) => {
     if (!agendamentosList || agendamentosList.length === 0) return;
     
-    const [ano, mesNum] = mes.split('-');
-    const dataInicio = new Date(ano, mesNum - 1, 1);
-    const dataFim = new Date(ano, mesNum, 0, 23, 59, 59, 999);
+    const dataInicio = new Date(dataInicial);
+    dataInicio.setHours(0, 0, 0, 0);
+
+    const dataFim = new Date(dataFinal);
+    dataFim.setHours(23, 59, 59, 999);
     
     const filtrados = agendamentosList.filter(a => {
       if (a.ePrevisao) return true;
@@ -87,8 +97,8 @@ const LeituraPage = () => {
       // Se a busca não retornou resultados, volta para os filtros normais
       if (agendamentos.length > 0) {
         const hoje = new Date();
-        const mesAtual = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`;
-        applyDefaultFilters(agendamentos, mesAtual);
+        const primeiroDiaDoMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+        applyDefaultFilters(agendamentos, primeiroDiaDoMes, hoje);
       } else {
         fetchAgendamentos();
       }
@@ -104,14 +114,20 @@ const LeituraPage = () => {
     }
     
     if (filtros.status) {
-      resultado = resultado.filter(a => a.status === filtros.status);
+      if (filtros.status.length > 0) {
+        resultado = resultado.filter(a => filtros.status.includes(a.status));
+      } else {
+        // Se nenhum status for selecionado, a lista fica vazia
+        resultado = [];
+      }
     }
     
-    // Filtra por mês
-    if (filtros.mes) {
-      const [ano, mes] = filtros.mes.split('-');
-      const dataInicio = new Date(ano, mes - 1, 1);
-      const dataFim = new Date(ano, mes, 0, 23, 59, 59, 999);
+    // Filtra por data
+    if (filtros.dataInicial && filtros.dataFinal) {
+      const dataInicio = new Date(filtros.dataInicial);
+      dataInicio.setHours(0, 0, 0, 0);
+      const dataFim = new Date(filtros.dataFinal);
+      dataFim.setHours(23, 59, 59, 999);
       
       resultado = resultado.filter(a => {
         if (a.ePrevisao) return true;
@@ -157,13 +173,25 @@ const LeituraPage = () => {
     setFilteredAgendamentos(resultado);
   }, [agendamentos, searchResults]);
   
+  const handleRowClick = (agendamento) => {
+    setSelectedAgendamento(agendamento);
+  };
+
+  const closeModal = () => {
+    setSelectedAgendamento(null);
+  };
+  
   return (
-    <div className="page leitura-page">
+    <div className="page leitura-page" style={{ maxWidth: '70%', margin: '0 auto' }}>
       <h2>Leitura</h2>
       
       <SearchInput onSearchResults={handleSearchResults} />
       
       <FilterControls onFilter={handleFilter} />
+      
+      <div className="total-volumes-info">
+        <p>Volumetria total: <strong>{totalVolumes}</strong></p>
+      </div>
       
       {searchResults !== null && (
         <div className="search-info">
@@ -172,8 +200,8 @@ const LeituraPage = () => {
             setSearchResults(null);
             // Aplica filtros aos agendamentos gerais quando limpa a busca
             const hoje = new Date();
-            const mesAtual = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`;
-            applyDefaultFilters(agendamentos, mesAtual);
+            const primeiroDiaDoMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+            applyDefaultFilters(agendamentos, primeiroDiaDoMes, hoje);
           }}>
             Limpar busca
           </button>
@@ -182,8 +210,19 @@ const LeituraPage = () => {
       
       <SchedulesList 
         agendamentos={filteredAgendamentos} 
-        loading={loading} 
+        loading={loading}
+        onRowClick={handleRowClick}
       />
+
+      {selectedAgendamento && (
+        <InvoiceDetailsModal
+          isOpen={!!selectedAgendamento}
+          onClose={closeModal}
+          agendamento={selectedAgendamento}
+          onRefresh={fetchAgendamentos}
+          isLeitura={true}
+        />
+      )}
     </div>
   );
 };

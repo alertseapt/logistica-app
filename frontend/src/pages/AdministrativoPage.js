@@ -19,7 +19,7 @@ const AdministrativoPage = () => {
   };
   
   return (
-    <div className="page administrativo-page">
+    <div className="page administrativo-page" style={{ maxWidth: '70%', margin: '0 auto' }}>
       <h2>Administrativo</h2>
       
       <div className="action-buttons">

@@ -60,18 +60,40 @@ const ToBePalletizedList = ({ refresh, onRefresh }) => {
       {agendamentos.length === 0 ? (
         <p>Nenhum agendamento a paletizar</p>
       ) : (
-        <ul>
+        <div className="agendamentos-container">
           {agendamentos.map(item => (
-            <li key={item.id}>
+            <div 
+              key={item.id} 
+              style={{ 
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '20px',
+                padding: '10px',
+                backgroundColor: '#f5f5f5',
+                borderRadius: '4px',
+                marginBottom: '10px'
+              }}
+            >
               <span>NF: {item.numeroNF}</span>
-              <span>Cliente: {item.cliente.nome}</span>
-              <span>Volumes: {item.volumes}</span>
-              <button onClick={() => handleUpdateStatus(item.id, 'paletizado')}>
+              <span>{item.cliente.nome}</span>
+              <span>VOL: {item.volumes}</span>
+              <button 
+                onClick={() => handleUpdateStatus(item.id, 'paletizado')}
+                style={{
+                  padding: '8px 16px',
+                  backgroundColor: '#4CAF50',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer'
+                }}
+              >
                 Paletizado
               </button>
-            </li>
+            </div>
           ))}
-        </ul>
+        </div>
       )}
     </div>
   );

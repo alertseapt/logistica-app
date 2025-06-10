@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { formatarData, formatarDataHora } from '../../utils/nfUtils';
-import { updateAgendamento } from '../../services/api';
+import { updateAgendamento, deleteAgendamento, getClientes } from '../../services/api';
 
 const InvoiceDetailsModal = ({ agendamento, onClose, onRefresh }) => {
   const [isEditing, setIsEditing] = useState(false);
@@ -8,10 +8,28 @@ const InvoiceDetailsModal = ({ agendamento, onClose, onRefresh }) => {
     numeroNF: agendamento?.numeroNF || '',
     chaveAcesso: agendamento?.chaveAcesso || '',
     volumes: agendamento?.volumes || 0,
-    observacoes: agendamento?.observacoes || ''
+    observacoes: agendamento?.observacoes || '',
+    clienteId: agendamento?.clienteId || ''
   });
   const [saving, setSaving] = useState(false);
   const [mensagem, setMensagem] = useState('');
+  const [clientes, setClientes] = useState([]);
+  
+  useEffect(() => {
+    if (isEditing) {
+      fetchClientes();
+    }
+  }, [isEditing]);
+
+  const fetchClientes = async () => {
+    try {
+      const clientesList = await getClientes();
+      clientesList.sort((a, b) => a.nome.localeCompare(b.nome));
+      setClientes(clientesList);
+    } catch (error) {
+      console.error('Erro ao carregar clientes:', error);
+    }
+  };
   
   if (!agendamento) return null;
   
@@ -60,7 +78,20 @@ const InvoiceDetailsModal = ({ agendamento, onClose, onRefresh }) => {
       setSaving(false);
     }
   };
-  
+
+  const handleDelete = async () => {
+    if (window.confirm('Tem certeza que deseja excluir esta nota fiscal?')) {
+      try {
+        await deleteAgendamento(agendamento.id);
+        onRefresh();
+        onClose();
+      } catch (error) {
+        console.error('Erro ao excluir nota fiscal:', error);
+        alert('Erro ao excluir nota fiscal');
+      }
+    }
+  };
+
   console.log("Renderizando modal para agendamento:", agendamento.id);
   
   return (
@@ -77,21 +108,38 @@ const InvoiceDetailsModal = ({ agendamento, onClose, onRefresh }) => {
                 Editar
               </button>
             ) : (
-              <button 
-                className="cancel-edit-button" 
-                onClick={() => {
-                  setIsEditing(false);
-                  setEditedData({
-                    numeroNF: agendamento.numeroNF || '',
-                    chaveAcesso: agendamento.chaveAcesso || '',
-                    volumes: agendamento.volumes || 0,
-                    observacoes: agendamento.observacoes || ''
-                  });
-                  setMensagem('');
-                }}
-              >
-                Cancelar Edição
-              </button>
+              <>
+                <button 
+                  className="cancel-edit-button" 
+                  onClick={() => {
+                    setIsEditing(false);
+                    setEditedData({
+                      numeroNF: agendamento.numeroNF || '',
+                      chaveAcesso: agendamento.chaveAcesso || '',
+                      volumes: agendamento.volumes || 0,
+                      observacoes: agendamento.observacoes || '',
+                      clienteId: agendamento.clienteId || ''
+                    });
+                    setMensagem('');
+                  }}
+                >
+                  Cancelar Edição
+                </button>
+                <button 
+                  className="delete-button" 
+                  onClick={handleDelete}
+                  style={{
+                    backgroundColor: '#dc3545',
+                    color: 'white',
+                    border: 'none',
+                    padding: '8px 12px',
+                    borderRadius: '4px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Excluir
+                </button>
+              </>
             )}
             <button className="close-button" onClick={onClose}>×</button>
           </div>
@@ -119,6 +167,22 @@ const InvoiceDetailsModal = ({ agendamento, onClose, onRefresh }) => {
                   onChange={handleInputChange}
                   placeholder="Informe a chave de acesso"
                 />
+              </div>
+
+              <div className="form-group">
+                <label>Cliente:</label>
+                <select
+                  name="clienteId"
+                  value={editedData.clienteId}
+                  onChange={handleInputChange}
+                >
+                  <option value="">Selecione um cliente</option>
+                  {clientes.map(cliente => (
+                    <option key={cliente.id} value={cliente.id}>
+                      {cliente.nome}
+                    </option>
+                  ))}
+                </select>
               </div>
               
               <div className="form-group">
